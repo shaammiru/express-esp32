@@ -1,0 +1,120 @@
+doctype html
+html
+  head
+    title ESP32 Serial Data Viewer
+    style.
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        padding: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      button {
+        margin: 10px 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .pagination {
+        margin-top: 20px;
+        text-align: center;
+      }
+      .pagination button {
+        margin: 0 5px;
+        padding: 10px 15px;
+        font-size: 14px;
+      }
+  body
+    h1 ESP32 Serial Data Viewer
+    div
+      button(onclick="fetchLatestData()") Refresh Latest Data
+      button(onclick="clearData()") Clear Data
+    div#table-container
+      table#data-table
+        thead
+          tr
+            th Timestamp
+            th Temperature
+            th Humidity
+            th pH
+        tbody
+          tr
+            td(colspan="4") No data available
+    div.pagination
+      button(id="prev-page", onclick="changePage(-1)") Previous
+      span#current-page Page 1
+      button(id="next-page", onclick="changePage(1)") Next
+    script.
+      let currentPage = 1;
+      const limit = 10;
+
+      async function fetchLatestData() {
+        const response = await fetch(`/data?page=${currentPage}&limit=${limit}`);
+        const { currentPage: pageNow, totalPages, data } = await response.json();
+        updateTable(data);
+        document.querySelector("#current-page").textContent = `Page ${pageNow} of ${totalPages}`;
+        togglePaginationButtons(pageNow, totalPages);
+      }
+
+      async function fetchPageData(page) {
+        const response = await fetch(`/data?page=${page}&limit=${limit}`);
+        const { currentPage: pageNow, totalPages, data } = await response.json();
+        updateTable(data);
+        document.querySelector("#current-page").textContent = `Page ${pageNow} of ${totalPages}`;
+        togglePaginationButtons(pageNow, totalPages);
+      }
+
+      async function clearData() {
+        await fetch('/data/clear', { method: 'POST' });
+        currentPage = 1;
+        updateTable([]);
+        document.querySelector("#current-page").textContent = "Page 1";
+        togglePaginationButtons(1, 1);
+      }
+
+      function updateTable(data) {
+        const tbody = document.querySelector('#data-table tbody');
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4">No data available</td></tr>';
+          return;
+        }
+        data.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.Timestamp}</td>
+            <td>${row.Temperature}</td>
+            <td>${row.Humidity}</td>
+            <td>${row.pH}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function changePage(direction) {
+        currentPage += direction;
+        fetchPageData(currentPage);
+      }
+
+      function togglePaginationButtons(currentPage, totalPages) {
+        document.querySelector("#prev-page").disabled = currentPage <= 1;
+        document.querySelector("#next-page").disabled = currentPage >= totalPages;
+      }
+
+      // Refresh otomatis setiap 5 detik
+      setInterval(fetchLatestData, 5000);
+
+      // Memuat data awal saat halaman pertama kali dibuka
+      fetchPageData(1);
+
